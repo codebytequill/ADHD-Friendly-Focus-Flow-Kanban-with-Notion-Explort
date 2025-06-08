@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADHD-Friendly Kanban Task Tracker</title>
+    <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
+    <link href="[https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap](https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap)" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overscroll-behavior: none; 
+        }
+        .kanban-column {
+            min-height: 300px; 
+        }
+        .task-card {
+            cursor: grab;
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, border-left-width 0.2s ease-in-out;
+            border-left-width: 5px; /* Default border for priority */
+            border-left-color: transparent; /* Default transparent */
+        }
+        .task-card.priority-high { border-left-color: #f87171; /* red-400 */ }
+        .task-card.priority-medium { border-left-color: #facc15; /* yellow-400 */ }
+        .task-card.priority-low { border-left-color: #60a5fa; /* blue-400 */ }
+
+        .task-card:active {
+            cursor: grabbing;
+            transform: scale(1.05);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .dragging {
+            opacity: 0.5;
+        }
+        #confettiCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; 
+            z-index: 9999;
+        }
+        .kanban-column::-webkit-scrollbar { width: 8px; }
+        .kanban-column::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        .kanban-column::-webkit-scrollbar-thumb { background: #888; border-radius: 10px; }
+        .kanban-column::-webkit-scrollbar-thumb:hover { background: #555; }
+        
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.5); display: flex;
+            justify-content: center; align-items: center; z-index: 10000;
+            padding: 1rem; /* Add padding for smaller screens */
+        }
+        .modal-content {
+            background-color: white; padding: 20px; border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); text-align: center;
+            max-width: 90vw; /* Max width for modal */
+            max-height: 80vh; /* Max height for modal */
+            overflow-y: auto; /* Scroll if content overflows */
+        }
+        .modal-content textarea {
+            width: 100%;
+            min-height: 200px;
+            margin-top: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 8px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            resize: vertical;
+        }
+        .due-date-text {
+            font-size: 0.8rem;
+            color: #cbd5e1; /* slate-300 */
+            margin-top: 4px;
+        }
+        .priority-badge {
+            font-size: 0.75rem;
+            padding: 2px 6px;
+            border-radius: 12px;
+            font-weight: 500;
+            margin-right: 8px;
+        }
+        .badge-high { background-color: #f87171; color: white; }
+        .badge-medium { background-color: #facc15; color: #422006; } /* Darker text for yellow */
+        .badge-low { background-color: #60a5fa; color: white; }
+
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 to-slate-800 text-white min-h-screen flex flex-col items-center justify-start p-4 sm:p-8">
+
+    <div id="app-container" class="w-full max-w-5xl mx-auto">
+        <header class="mb-8 text-center">
+            <h1 class="text-4xl sm:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">FocusFlow Kanban</h1>
+            <p class="text-slate-400 mt-2">Organize with clarity, celebrate your progress!</p>
+            <div id="userInfo" class="mt-2 text-xs text-slate-500">Loading user...</div>
+        </header>
+
+        <div class="mb-8 p-6 bg-slate-800 rounded-xl shadow-2xl">
+            <h2 class="text-2xl font-semibold mb-4 text-slate-200">Add New Task</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label for="taskPriority" class="block text-sm font-medium text-slate-300 mb-1">Priority</label>
+                    <select id="taskPriority" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 outline-none text-slate-100">
+                        <option value="medium" selected class="bg-slate-700">Medium</option>
+                        <option value="high" class="bg-slate-700">High</option>
+                        <option value="low" class="bg-slate-700">Low</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="taskDueDate" class="block text-sm font-medium text-slate-300 mb-1">Due Date (Optional)</label>
+                    <input type="date" id="taskDueDate" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 outline-none text-slate-100 placeholder-slate-400" style="color-scheme: dark;">
+                </div>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-4">
+                <input type="text" id="taskInput" placeholder="Enter task description..." class="flex-grow p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-pink-500 outline-none text-slate-100 placeholder-slate-400">
+                <button id="addTaskBtn" class="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-150 ease-in-out transform hover:scale-105">
+                    Add Task
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div id="todo" class="kanban-column bg-slate-800 p-5 rounded-xl shadow-xl overflow-y-auto max-h-[60vh]">
+                <h3 class="text-xl font-semibold mb-4 text-purple-400 border-b-2 border-purple-400 pb-2">To Do</h3>
+                <div id="todo-tasks" class="space-y-3"></div>
+            </div>
+            <div id="inprogress" class="kanban-column bg-slate-800 p-5 rounded-xl shadow-xl overflow-y-auto max-h-[60vh]">
+                <h3 class="text-xl font-semibold mb-4 text-yellow-400 border-b-2 border-yellow-400 pb-2">In Progress</h3>
+                <div id="inprogress-tasks" class="space-y-3"></div>
+            </div>
+            <div id="done" class="kanban-column bg-slate-800 p-5 rounded-xl shadow-xl overflow-y-auto max-h-[60vh]">
+                <h3 class="text-xl font-semibold mb-4 text-green-400 border-b-2 border-green-400 pb-2">Done</h3>
+                <div id="done-tasks" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <div class="mt-8 p-6 bg-slate-800 rounded-xl shadow-2xl text-center">
+            <h2 class="text-2xl font-semibold mb-4 text-slate-200">Notion Tools</h2>
+            <button id="exportForNotionBtn" class="bg-gradient-to-r from-sky-500 to-cyan-500 hover:from-sky-600 hover:to-cyan-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-150 ease-in-out transform hover:scale-105 mb-4">
+                Export Tasks for Notion
+            </button>
+            <div class="mt-4 p-4 bg-slate-700 rounded-lg">
+                <h3 class="text-lg font-semibold text-slate-300 mb-2">Deeper Notion Integration (Future Idea)</h3>
+                <p class="text-sm text-slate-400 mb-3">
+                    A full, two-way sync with Notion would require backend services for secure authentication and API communication. 
+                    This is a more advanced feature. For now, use the export button to copy tasks into Notion.
+                </p>
+                <button class="bg-gray-500 text-white font-semibold py-2 px-4 rounded-lg opacity-50 cursor-not-allowed" title="Feature under consideration">
+                    Connect to Notion (Conceptual)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="confettiCanvas"></canvas>
+
+    <div id="messageModal" class="modal-overlay hidden">
+        <div class="modal-content text-slate-800">
+            <p id="modalMessageText" class="text-lg mb-2"></p>
+            <textarea id="modalTextarea" class="hidden"></textarea>
+            <button id="modalCopyButton" class="hidden mt-2 bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 font-semibold">Copy to Clipboard</button>
+            <button id="modalCloseButton" class="mt-4 bg-pink-500 text-white py-2 px-4 rounded-lg hover:bg-pink-600 font-semibold">OK</button>
+        </div>
+    </div>
+
+
+    <script type="module">
+        // Firebase and App Imports
+        import { initializeApp } from "[https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js](https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js)";
+        import { 
+            getAuth, 
+            signInAnonymously, 
+            signInWithCustomToken, 
+            onAuthStateChanged 
+        } from "[https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js](https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js)";
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            doc, 
+            updateDoc, 
+            deleteDoc, 
+            onSnapshot,
+            query,
+            serverTimestamp,
+            setLogLevel
+        } from "[https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js](https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js)";
+
+        // --- Firebase Configuration and Initialization ---
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "YOUR_API_KEY", authDomain: "YOUR_AUTH_DOMAIN", projectId: "YOUR_PROJECT_ID" }; 
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'adhd-kanban-app-notion';
+        
+        let app;
+        let auth;
+        let db;
+        let userId;
+        let tasksCollectionRef;
+        let unsubscribeTasks; 
+        let allTasksData = []; // To store current tasks for export
+
+        setLogLevel('debug');
+
+        async function initializeFirebase() {
+            try {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                console.log("Firebase initialized successfully.");
+
+                return new Promise((resolve) => {
+                    onAuthStateChanged(auth, async (user) => {
+                        if (user) {
+                            userId = user.uid;
+                            console.log("User is signed in with UID:", userId);
+                            document.getElementById('userInfo').textContent = `User ID: ${userId}`;
+                            tasksCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/tasks`);
+                            await loadTasks(); 
+                            resolve();
+                        } else {
+                            console.log("User is not signed in. Attempting to sign in...");
+                            try {
+                                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                                    await signInWithCustomToken(auth, __initial_auth_token);
+                                    console.log("Signed in with custom token.");
+                                } else {
+                                    await signInAnonymously(auth);
+                                    console.log("Signed in anonymously.");
+                                }
+                            } catch (error) {
+                                console.error("Error during sign-in:", error);
+                                showModalMessage(`Sign-in Error: ${error.message}. Some features may be limited.`);
+                                document.getElementById('userInfo').textContent = 'User: Anonymous (Sign-in failed)';
+                                resolve(); 
+                            }
+                        }
+                    });
+                });
+            } catch (error) {
+                console.error("Error initializing Firebase:", error);
+                showModalMessage(`Firebase Init Error: ${error.message}. App may not function correctly.`);
+                document.getElementById('userInfo').textContent = 'Error: Firebase init failed.';
+                return Promise.reject(error); 
+            }
+        }
+
+        // --- DOM Elements ---
+        const taskInput = document.getElementById('taskInput');
+        const taskPriorityInput = document.getElementById('taskPriority');
+        const taskDueDateInput = document.getElementById('taskDueDate');
+        const addTaskBtn = document.getElementById('addTaskBtn');
+        const exportForNotionBtn = document.getElementById('exportForNotionBtn');
+        const columns = {
+            todo: document.getElementById('todo-tasks'),
+            inprogress: document.getElementById('inprogress-tasks'),
+            done: document.getElementById('done-tasks')
+        };
+        const confettiCanvas = document.getElementById('confettiCanvas');
+        const ctx = confettiCanvas.getContext('2d');
+
+        // --- Confetti Animation (Identical to previous version) ---
+        let confettiParticles = [];
+        const confettiColors = ["#f687b3", "#a78bfa", "#facc15", "#4ade80", "#60a5fa"];
+
+        function ConfettiParticle(x, y) {
+            this.x = x; this.y = y;
+            this.size = Math.random() * 7 + 3;
+            this.speedX = Math.random() * 3 - 1.5;
+            this.speedY = Math.random() * 2 + 2; 
+            this.color = confettiColors[Math.floor(Math.random() * confettiColors.length)];
+            this.opacity = 1; this.angle = Math.random() * Math.PI * 2;
+            this.spin = Math.random() < 0.5 ? -1 : 1; 
+            this.rotationSpeed = Math.random() * 0.1;
+        }
+        ConfettiParticle.prototype.update = function() {
+            this.x += this.speedX; this.y -= this.speedY; 
+            this.speedY -= 0.05; this.opacity -= 0.005;
+            this.angle += this.rotationSpeed * this.spin;
+        };
+        ConfettiParticle.prototype.draw = function() {
+            ctx.save(); ctx.globalAlpha = this.opacity;
+            ctx.translate(this.x, this.y); ctx.rotate(this.angle);
+            ctx.fillStyle = this.color;
+            ctx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size);
+            ctx.restore();
+        };
+        function animateConfetti() {
+            if (!confettiCanvas) return;
+            confettiCanvas.width = window.innerWidth; confettiCanvas.height = window.innerHeight;
+            ctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+            for (let i = confettiParticles.length - 1; i >= 0; i--) {
+                confettiParticles[i].update(); confettiParticles[i].draw();
+                if (confettiParticles[i].opacity <= 0 || confettiParticles[i].y > confettiCanvas.height + confettiParticles[i].size) { 
+                    confettiParticles.splice(i, 1);
+                }
+            }
+            if (confettiParticles.length > 0) requestAnimationFrame(animateConfetti);
+            else ctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+        }
+        function triggerConfetti() {
+            if (!confettiCanvas) return;
+            const centerX = confettiCanvas.width / 2; const centerY = confettiCanvas.height / 2;
+            confettiParticles = []; 
+            for (let i = 0; i < 150; i++) { 
+                confettiParticles.push(new ConfettiParticle(centerX, centerY + 100)); 
+            }
+            if (confettiParticles.length > 0) animateConfetti();
+        }
+        
+        // --- Task Management ---
+        async function addTask() {
+            const taskText = taskInput.value.trim();
+            const taskPriority = taskPriorityInput.value;
+            const taskDueDate = taskDueDateInput.value; 
+
+            if (!taskText) {
+                showModalMessage("Oops! Task description can't be empty.");
+                return;
+            }
+            if (!db || !userId || !tasksCollectionRef) {
+                 showModalMessage("Hold on! Firestore isn't ready. Please wait a moment or refresh.");
+                 console.error("Firestore not ready for adding task.");
+                 return;
+            }
+
+            try {
+                const newTask = {
+                    text: taskText,
+                    status: 'todo', 
+                    priority: taskPriority,
+                    dueDate: taskDueDate || null, 
+                    createdAt: serverTimestamp(), 
+                    userId: userId 
+                };
+                await addDoc(tasksCollectionRef, newTask);
+                // console.log("Task added with ID: ", docRef.id); // onSnapshot will log
+                taskInput.value = '';
+                taskDueDateInput.value = ''; 
+                taskPriorityInput.value = 'medium'; 
+                showModalMessage("✨ Task added successfully! ✨", 2000); 
+            } catch (error) {
+                console.error("Error adding task to Firestore: ", error);
+                showModalMessage(`Bummer! Error adding task: ${error.message}`);
+            }
+        }
+
+        function createTaskCard(id, taskData) {
+            const { text, status, priority, dueDate } = taskData;
+
+            if (document.getElementById(id)) { // Update existing card
+                const existingCard = document.getElementById(id);
+                existingCard.querySelector('.task-text').textContent = text;
+                
+                existingCard.classList.remove('priority-high', 'priority-medium', 'priority-low');
+                if (priority) existingCard.classList.add(`priority-${priority}`);
+
+                const priorityBadge = existingCard.querySelector('.priority-badge');
+                if (priorityBadge) {
+                    priorityBadge.textContent = priority.charAt(0).toUpperCase() + priority.slice(1);
+                    priorityBadge.className = `priority-badge badge-${priority}`;
+                }
+
+                const dueDateEl = existingCard.querySelector('.due-date-text');
+                if (dueDate) {
+                    const dateObj = new Date(dueDate + 'T00:00:00');
+                    const formattedDate = dateObj.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+                    if (dueDateEl) {
+                        dueDateEl.textContent = `Due: ${formattedDate}`;
+                    } else {
+                        const newDueDateEl = document.createElement('div');
+                        newDueDateEl.className = 'due-date-text';
+                        newDueDateEl.textContent = `Due: ${formattedDate}`;
+                        existingCard.appendChild(newDueDateEl);
+                    }
+                } else if (dueDateEl) {
+                    dueDateEl.remove();
+                }
+
+                const currentColumnContainer = existingCard.parentElement;
+                if (currentColumnContainer.parentElement.id !== status) {
+                    columns[status].appendChild(existingCard);
+                }
+                return existingCard;
+            }
+
+            // Create new card
+            const card = document.createElement('div');
+            card.id = id;
+            card.className = `task-card bg-slate-700 p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-150 priority-${priority || 'medium'}`;
+            card.draggable = true;
+
+            const cardHeader = document.createElement('div');
+            cardHeader.className = 'flex justify-between items-start mb-2';
+
+            const priorityBadge = document.createElement('span');
+            priorityBadge.className = `priority-badge badge-${priority || 'medium'}`;
+            priorityBadge.textContent = priority ? priority.charAt(0).toUpperCase() + priority.slice(1) : 'Medium';
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.innerHTML = '&times;'; 
+            deleteBtn.className = 'text-red-400 hover:text-red-600 font-bold text-xl -mt-2'; 
+            deleteBtn.title = "Delete task";
+            deleteBtn.onclick = async () => {
+                const userConfirmed = await showConfirmationModal("Are you sure you want to delete this task?");
+                if (userConfirmed) {
+                    try {
+                        if (!db || !userId) {
+                            showModalMessage("Firestore is not initialized. Cannot delete task."); return;
+                        }
+                        await deleteDoc(doc(db, `artifacts/${appId}/users/${userId}/tasks`, id));
+                        showModalMessage("🗑️ Task deleted.", 1500);
+                    } catch (error) {
+                        console.error("Error deleting task from Firestore: ", error);
+                        showModalMessage(`Error deleting task: ${error.message}`);
+                    }
+                }
+            };
+            
+            cardHeader.appendChild(priorityBadge);
+            cardHeader.appendChild(deleteBtn);
+            card.appendChild(cardHeader);
+
+            const textP = document.createElement('p');
+            textP.textContent = text;
+            textP.className = 'text-slate-100 break-words task-text'; 
+            card.appendChild(textP);
+
+            if (dueDate) {
+                const dueDateEl = document.createElement('div');
+                dueDateEl.className = 'due-date-text';
+                const dateObj = new Date(dueDate + 'T00:00:00'); 
+                dueDateEl.textContent = `Due: ${dateObj.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}`;
+                card.appendChild(dueDateEl);
+            }
+            
+            card.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', id);
+                setTimeout(() => card.classList.add('dragging'), 0); 
+            });
+            card.addEventListener('dragend', () => card.classList.remove('dragging'));
+
+            columns[status].appendChild(card);
+            return card;
+        }
+
+        async function loadTasks() {
+            if (!db || !userId || !tasksCollectionRef) {
+                console.warn("Firestore not ready, skipping task load.");
+                return;
+            }
+            // No need to clear columns here, onSnapshot logic handles additions/removals/updates.
+            if (unsubscribeTasks) unsubscribeTasks();
+            
+            console.log("Setting up new task listener for user:", userId);
+            const q = query(tasksCollectionRef); // Consider orderBy('createdAt') for consistent order
+
+            unsubscribeTasks = onSnapshot(q, (querySnapshot) => {
+                console.log("Received task snapshot update. Processing changes...");
+                allTasksData = []; // Reset for export
+                const tasksInFirestore = new Set();
+
+                querySnapshot.forEach((docSnap) => {
+                    tasksInFirestore.add(docSnap.id);
+                    const taskData = docSnap.data();
+                    taskData.id = docSnap.id; // Add id to taskData for easier access
+                    allTasksData.push(taskData); // Store for export
+                    createTaskCard(docSnap.id, taskData); 
+                });
+                
+                // Sort allTasksData by status then by priority (High > Medium > Low)
+                const priorityOrder = { high: 1, medium: 2, low: 3 };
+                allTasksData.sort((a, b) => {
+                    if (a.status < b.status) return -1;
+                    if (a.status > b.status) return 1;
+                    return (priorityOrder[a.priority] || 4) - (priorityOrder[b.priority] || 4);
+                });
+
+
+                // Remove tasks from DOM that are no longer in Firestore
+                document.querySelectorAll('.task-card').forEach(cardElement => {
+                    if (!tasksInFirestore.has(cardElement.id)) {
+                        cardElement.remove();
+                        console.log("Removed task from DOM (not in Firestore):", cardElement.id);
+                    }
+                });
+            }, (error) => {
+                console.error("Error listening to task changes: ", error);
+                showModalMessage(`Error loading tasks: ${error.message}`);
+            });
+        }
+
+        // --- Drag and Drop ---
+        Object.keys(columns).forEach(columnKey => {
+            const columnEl = document.getElementById(columnKey); 
+            if (columnEl) {
+                columnEl.addEventListener('dragover', (e) => { e.preventDefault(); columnEl.classList.add('bg-slate-700'); });
+                columnEl.addEventListener('dragleave', () => columnEl.classList.remove('bg-slate-700'));
+                columnEl.addEventListener('drop', async (e) => {
+                    e.preventDefault();
+                    columnEl.classList.remove('bg-slate-700');
+                    const taskId = e.dataTransfer.getData('text/plain');
+                    const targetStatus = columnKey; 
+
+                    if (document.getElementById(taskId) && columns[targetStatus]) {
+                        if (!db || !userId) {
+                            showModalMessage("Firestore not initialized. Cannot update task status."); return;
+                        }
+                        try {
+                            const taskDocRef = doc(db, `artifacts/${appId}/users/${userId}/tasks`, taskId);
+                            await updateDoc(taskDocRef, { status: targetStatus });
+                            // console.log(`Task ${taskId} status updated to ${targetStatus} in Firestore.`); // onSnapshot handles UI
+                            if (targetStatus === 'done') {
+                                triggerConfetti();
+                                showModalMessage("🎉 Task Completed! Well done! 🎉", 2500);
+                            } else {
+                                showModalMessage(`Task moved to ${targetStatus.charAt(0).toUpperCase() + targetStatus.slice(1)}!`, 1500);
+                            }
+                        } catch (error) {
+                            console.error("Error updating task status in Firestore: ", error);
+                            showModalMessage(`Error moving task: ${error.message}`);
+                        }
+                    }
+                });
+            } else { console.error(`Column element with ID ${columnKey} not found.`); }
+        });
+
+        // --- Notion Export ---
+        function generateMarkdownForNotion() {
+            let markdown = "# Kanban Task Export\n\n";
+            const tasksByStatus = { todo: [], inprogress: [], done: [] };
+
+            allTasksData.forEach(task => {
+                if (tasksByStatus[task.status]) {
+                    tasksByStatus[task.status].push(task);
+                }
+            });
+
+            if (tasksByStatus.todo.length > 0) {
+                markdown += "## ⏳ To Do\n";
+                tasksByStatus.todo.forEach(task => {
+                    markdown += `- [ ] ${task.text}`;
+                    if (task.priority) markdown += ` (Priority: ${task.priority.charAt(0).toUpperCase() + task.priority.slice(1)})`;
+                    if (task.dueDate) {
+                         const dateObj = new Date(task.dueDate + 'T00:00:00');
+                         markdown += ` (Due: ${dateObj.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})})`;
+                    }
+                    markdown += "\n";
+                });
+                markdown += "\n";
+            }
+
+            if (tasksByStatus.inprogress.length > 0) {
+                markdown += "## ⚙️ In Progress\n";
+                tasksByStatus.inprogress.forEach(task => {
+                    markdown += `- ${task.text}`; // Notion doesn't have a standard "in progress" checkbox
+                    if (task.priority) markdown += ` (Priority: ${task.priority.charAt(0).toUpperCase() + task.priority.slice(1)})`;
+                     if (task.dueDate) {
+                         const dateObj = new Date(task.dueDate + 'T00:00:00');
+                         markdown += ` (Due: ${dateObj.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})})`;
+                    }
+                    markdown += "\n";
+                });
+                markdown += "\n";
+            }
+
+            if (tasksByStatus.done.length > 0) {
+                markdown += "## ✅ Done\n";
+                tasksByStatus.done.forEach(task => {
+                    markdown += `- [x] ${task.text}`; // Checked box for done tasks
+                    if (task.priority) markdown += ` (Priority: ${task.priority.charAt(0).toUpperCase() + task.priority.slice(1)})`;
+                     if (task.dueDate) {
+                         const dateObj = new Date(task.dueDate + 'T00:00:00');
+                         markdown += ` (Due: ${dateObj.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})})`;
+                    }
+                    markdown += "\n";
+                });
+            }
+            
+            if (allTasksData.length === 0) {
+                markdown += "No tasks to export yet!\n";
+            }
+
+            return markdown;
+        }
+
+        if (exportForNotionBtn) {
+            exportForNotionBtn.addEventListener('click', () => {
+                const markdownContent = generateMarkdownForNotion();
+                const modalTextarea = document.getElementById('modalTextarea');
+                const modalCopyButton = document.getElementById('modalCopyButton');
+                
+                showModalMessage("Tasks Exported for Notion (Copy Below):", null, true); // isExportModal = true
+                modalTextarea.value = markdownContent;
+                modalTextarea.classList.remove('hidden');
+                modalCopyButton.classList.remove('hidden');
+
+                modalTextarea.select(); // Select for easy copying
+            });
+        }
+
+
+        // --- Modal Logic ---
+        const messageModal = document.getElementById('messageModal');
+        const modalMessageText = document.getElementById('modalMessageText');
+        const modalCloseButton = document.getElementById('modalCloseButton');
+        const modalTextarea = document.getElementById('modalTextarea');
+        const modalCopyButton = document.getElementById('modalCopyButton');
+        let modalTimeoutId = null;
+
+        function showModalMessage(message, duration = null, isExportModal = false) {
+            if (modalMessageText && messageModal && modalCloseButton && modalTextarea && modalCopyButton) {
+                modalMessageText.textContent = message;
+                messageModal.classList.remove('hidden');
+                modalCloseButton.textContent = "OK"; 
+                
+                // Reset visibility of export-specific elements
+                modalTextarea.classList.add('hidden');
+                modalCopyButton.classList.add('hidden');
+
+                if (modalTimeoutId) clearTimeout(modalTimeoutId);
+
+                if (duration && !isExportModal) { // Auto-close only if not an export modal
+                    modalTimeoutId = setTimeout(() => {
+                        messageModal.classList.add('hidden');
+                    }, duration);
+                }
+                
+                // If it's not an export modal, ensure the OK button is the primary action
+                if (!isExportModal) {
+                     modalCloseButton.classList.remove('hidden'); // Ensure OK is visible
+                     // Hide Yes/No if they were visible from a confirmation
+                     const yesBtn = document.getElementById('modalYesButton');
+                     const noBtn = document.getElementById('modalNoButton');
+                     if(yesBtn) yesBtn.classList.add('hidden');
+                     if(noBtn) noBtn.classList.add('hidden');
+                }
+
+
+            } else {
+                console.warn("Modal elements not found, using console for message:", message);
+            }
+        }
+        
+        async function showConfirmationModal(message) {
+            return new Promise((resolve) => {
+                if (modalMessageText && messageModal && modalCloseButton) {
+                    modalMessageText.textContent = message;
+                    
+                    let yesButton = document.getElementById('modalYesButton');
+                    let noButton = document.getElementById('modalNoButton');
+
+                    modalCloseButton.classList.add('hidden'); // Hide OK
+
+                    if (!yesButton) {
+                        yesButton = document.createElement('button');
+                        yesButton.id = 'modalYesButton';
+                        yesButton.className = 'mt-4 mr-2 bg-green-500 text-white py-2 px-4 rounded-lg hover:bg-green-600 font-semibold';
+                        modalCloseButton.parentElement.appendChild(yesButton);
+                    }
+                    yesButton.textContent = "Yes";
+                    yesButton.classList.remove('hidden');
+                    
+                    if (!noButton) {
+                        noButton = document.createElement('button');
+                        noButton.id = 'modalNoButton';
+                        noButton.className = 'mt-4 ml-2 bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 font-semibold';
+                        modalCloseButton.parentElement.appendChild(noButton);
+                    }
+                    noButton.textContent = "No";
+                    noButton.classList.remove('hidden');
+                    
+                    messageModal.classList.remove('hidden');
+                    modalTextarea.classList.add('hidden'); // Ensure textarea is hidden for confirmation
+                    modalCopyButton.classList.add('hidden'); // Ensure copy button is hidden
+
+                    yesButton.onclick = () => {
+                        messageModal.classList.add('hidden');
+                        yesButton.classList.add('hidden');
+                        noButton.classList.add('hidden');
+                        modalCloseButton.classList.remove('hidden'); 
+                        resolve(true);
+                    };
+                    noButton.onclick = () => {
+                        messageModal.classList.add('hidden');
+                        yesButton.classList.add('hidden');
+                        noButton.classList.add('hidden');
+                        modalCloseButton.classList.remove('hidden'); 
+                        resolve(false);
+                    };
+                } else {
+                    console.warn("Modal elements not found for confirmation, defaulting to true.");
+                    resolve(true); 
+                }
+            });
+        }
+
+        if (modalCloseButton && messageModal) {
+            modalCloseButton.onclick = () => {
+                messageModal.classList.add('hidden');
+                if (modalTimeoutId) clearTimeout(modalTimeoutId);
+            };
+        }
+        if (modalCopyButton && modalTextarea) {
+            modalCopyButton.onclick = () => { // Corrected: Removed underscore
+                modalTextarea.select();
+                modalTextarea.setSelectionRange(0, 99999); // For mobile devices
+                try {
+                    // Use document.execCommand as navigator.clipboard may not work in all iframe contexts
+                    const successful = document.execCommand('copy');
+                    const msg = successful ? 'Copied to clipboard!' : 'Copying failed.';
+                    showModalMessage(msg, 2000); 
+                    if(!successful) console.error('Fallback: Could not copy text');
+                } catch (err) {
+                    console.error('Fallback: Could not copy text', err);
+                    showModalMessage('Copying failed. Please copy manually.', 3000);
+                }
+            };
+        }
+        
+        // --- Event Listeners ---
+        if (addTaskBtn && taskInput) {
+            addTaskBtn.addEventListener('click', addTask);
+            taskInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') addTask
