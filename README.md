@@ -1,1 +1,1 @@
-# ADHD-Friendly-Focus-Flow-Kanban-with-Notion-Explort
+# ADHD-Friendly-Focus-Flow-Kanban-with-Notion-Export
