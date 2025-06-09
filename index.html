@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ADHD-Friendly Kanban Task Tracker</title>
-    <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
-    <link href="[https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap](https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap)" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -168,13 +168,13 @@
 
     <script type="module">
         // Firebase and App Imports
-        import { initializeApp } from "[https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js](https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js)";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { 
             getAuth, 
             signInAnonymously, 
             signInWithCustomToken, 
             onAuthStateChanged 
-        } from "[https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js](https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js)";
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { 
             getFirestore, 
             collection, 
@@ -186,7 +186,7 @@
             query,
             serverTimestamp,
             setLogLevel
-        } from "[https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js](https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js)";
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Configuration and Initialization ---
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "YOUR_API_KEY", authDomain: "YOUR_AUTH_DOMAIN", projectId: "YOUR_PROJECT_ID" }; 
@@ -319,9 +319,9 @@
                 return;
             }
             if (!db || !userId || !tasksCollectionRef) {
-                 showModalMessage("Hold on! Firestore isn't ready. Please wait a moment or refresh.");
-                 console.error("Firestore not ready for adding task.");
-                 return;
+                showModalMessage("Hold on! Firestore isn't ready. Please wait a moment or refresh.");
+                console.error("Firestore not ready for adding task.");
+                return;
             }
 
             try {
@@ -542,8 +542,8 @@
                     markdown += `- [ ] ${task.text}`;
                     if (task.priority) markdown += ` (Priority: ${task.priority.charAt(0).toUpperCase() + task.priority.slice(1)})`;
                     if (task.dueDate) {
-                         const dateObj = new Date(task.dueDate + 'T00:00:00');
-                         markdown += ` (Due: ${dateObj.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})})`;
+                        const dateObj = new Date(task.dueDate + 'T00:00:00');
+                        markdown += ` (Due: ${dateObj.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})})`;
                     }
                     markdown += "\n";
                 });
@@ -555,9 +555,9 @@
                 tasksByStatus.inprogress.forEach(task => {
                     markdown += `- ${task.text}`; // Notion doesn't have a standard "in progress" checkbox
                     if (task.priority) markdown += ` (Priority: ${task.priority.charAt(0).toUpperCase() + task.priority.slice(1)})`;
-                     if (task.dueDate) {
-                         const dateObj = new Date(task.dueDate + 'T00:00:00');
-                         markdown += ` (Due: ${dateObj.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})})`;
+                    if (task.dueDate) {
+                        const dateObj = new Date(task.dueDate + 'T00:00:00');
+                        markdown += ` (Due: ${dateObj.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})})`;
                     }
                     markdown += "\n";
                 });
@@ -569,9 +569,9 @@
                 tasksByStatus.done.forEach(task => {
                     markdown += `- [x] ${task.text}`; // Checked box for done tasks
                     if (task.priority) markdown += ` (Priority: ${task.priority.charAt(0).toUpperCase() + task.priority.slice(1)})`;
-                     if (task.dueDate) {
-                         const dateObj = new Date(task.dueDate + 'T00:00:00');
-                         markdown += ` (Due: ${dateObj.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})})`;
+                    if (task.dueDate) {
+                        const dateObj = new Date(task.dueDate + 'T00:00:00');
+                        markdown += ` (Due: ${dateObj.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})})`;
                     }
                     markdown += "\n";
                 });
@@ -628,12 +628,12 @@
                 
                 // If it's not an export modal, ensure the OK button is the primary action
                 if (!isExportModal) {
-                     modalCloseButton.classList.remove('hidden'); // Ensure OK is visible
-                     // Hide Yes/No if they were visible from a confirmation
-                     const yesBtn = document.getElementById('modalYesButton');
-                     const noBtn = document.getElementById('modalNoButton');
-                     if(yesBtn) yesBtn.classList.add('hidden');
-                     if(noBtn) noBtn.classList.add('hidden');
+                    modalCloseButton.classList.remove('hidden'); // Ensure OK is visible
+                    // Hide Yes/No if they were visible from a confirmation
+                    const yesBtn = document.getElementById('modalYesButton');
+                    const noBtn = document.getElementById('modalNoButton');
+                    if(yesBtn) yesBtn.classList.add('hidden');
+                    if(noBtn) noBtn.classList.add('hidden');
                 }
 
 
@@ -702,11 +702,50 @@
             };
         }
         if (modalCopyButton && modalTextarea) {
-            modalCopyButton.onclick = () => { // Corrected: Removed underscore
+            modalCopyButton.onclick = () => { 
                 modalTextarea.select();
                 modalTextarea.setSelectionRange(0, 99999); // For mobile devices
                 try {
                     // Use document.execCommand as navigator.clipboard may not work in all iframe contexts
                     const successful = document.execCommand('copy');
                     const msg = successful ? 'Copied to clipboard!' : 'Copying failed.';
-                    showModalMessage(msg, 20
+                    showModalMessage(msg, 2000);
+                } catch (err) {
+                    console.error('Fallback: Oops, unable to copy', err);
+                    showModalMessage('Copying failed.', 2000);
+                }
+            };
+        }
+
+        // --- Event Listeners and Initial Load ---
+        if (addTaskBtn) {
+            addTaskBtn.addEventListener('click', addTask);
+        } else {
+            console.error("Add Task button not found!");
+        }
+        
+        if (taskInput) {
+            taskInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault(); // Prevent form submission if it's in a form
+                    addTask();
+                }
+            });
+        } else {
+            console.error("Task input field not found!");
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log("DOM fully loaded. Initializing application.");
+            try {
+                await initializeFirebase();
+                console.log("Firebase setup complete.");
+            } catch (error) {
+                console.error("Failed to initialize the application due to Firebase error:", error);
+                showModalMessage("Application failed to start. Please check the console and refresh.", null);
+            }
+        });
+    </script>
+</body>
+</html>
