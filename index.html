@@ -17,12 +17,12 @@
         .task-card {
             cursor: grab;
             transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, border-left-width 0.2s ease-in-out;
-            border-left-width: 5px; /* Default border for priority */
-            border-left-color: transparent; /* Default transparent */
+            border-left-width: 5px;
+            border-left-color: transparent;
         }
-        .task-card.priority-high { border-left-color: #f87171; /* red-400 */ }
-        .task-card.priority-medium { border-left-color: #facc15; /* yellow-400 */ }
-        .task-card.priority-low { border-left-color: #60a5fa; /* blue-400 */ }
+        .task-card.priority-high { border-left-color: #f87171; }
+        .task-card.priority-medium { border-left-color: #facc15; }
+        .task-card.priority-low { border-left-color: #60a5fa; }
 
         .task-card:active {
             cursor: grabbing;
@@ -50,14 +50,14 @@
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: rgba(0, 0, 0, 0.5); display: flex;
             justify-content: center; align-items: center; z-index: 10000;
-            padding: 1rem; /* Add padding for smaller screens */
+            padding: 1rem;
         }
         .modal-content {
             background-color: white; padding: 20px; border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); text-align: center;
-            max-width: 90vw; /* Max width for modal */
-            max-height: 80vh; /* Max height for modal */
-            overflow-y: auto; /* Scroll if content overflows */
+            max-width: 90vw;
+            max-height: 80vh;
+            overflow-y: auto;
         }
         .modal-content textarea {
             width: 100%;
@@ -72,7 +72,7 @@
         }
         .due-date-text {
             font-size: 0.8rem;
-            color: #cbd5e1; /* slate-300 */
+            color: #cbd5e1;
             margin-top: 4px;
         }
         .priority-badge {
@@ -83,9 +83,8 @@
             margin-right: 8px;
         }
         .badge-high { background-color: #f87171; color: white; }
-        .badge-medium { background-color: #facc15; color: #422006; } /* Darker text for yellow */
+        .badge-medium { background-color: #facc15; color: #422006; }
         .badge-low { background-color: #60a5fa; color: white; }
-
     </style>
 </head>
 <body class="bg-gradient-to-br from-slate-900 to-slate-800 text-white min-h-screen flex flex-col items-center justify-start p-4 sm:p-8">
@@ -172,7 +171,6 @@
         import { 
             getAuth, 
             signInAnonymously, 
-            signInWithCustomToken, 
             onAuthStateChanged 
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { 
@@ -184,23 +182,28 @@
             deleteDoc, 
             onSnapshot,
             query,
-            serverTimestamp,
-            setLogLevel
+            serverTimestamp
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Firebase Configuration and Initialization ---
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "YOUR_API_KEY", authDomain: "YOUR_AUTH_DOMAIN", projectId: "YOUR_PROJECT_ID" }; 
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'adhd-kanban-app-notion';
+        // --- Your web app's Firebase configuration ---
+        // REMINDER: Regenerate your API key in the Google Cloud Console and replace the one below.
+        const firebaseConfig = {
+          apiKey: "AIzaSyBYkX5kPxlrZUyZyrP-TK_lwKQd8CYSiyA",
+          authDomain: "focusflow-kanban-app.firebaseapp.com",
+          projectId: "focusflow-kanban-app",
+          storageBucket: "focusflow-kanban-app.appspot.com",
+          messagingSenderId: "155823397574",
+          appId: "1:155823397574:web:74d39bfdf23fdd631015c7"
+        };
         
+        // --- App State Variables ---
         let app;
         let auth;
         let db;
         let userId;
         let tasksCollectionRef;
         let unsubscribeTasks; 
-        let allTasksData = []; // To store current tasks for export
-
-        setLogLevel('debug');
+        let allTasksData = [];
 
         async function initializeFirebase() {
             try {
@@ -214,22 +217,19 @@
                         if (user) {
                             userId = user.uid;
                             console.log("User is signed in with UID:", userId);
-                            document.getElementById('userInfo').textContent = `User ID: ${userId}`;
-                            tasksCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/tasks`);
+                            document.getElementById('userInfo').textContent = `User ID: ${userId.substring(0, 8)}...`;
+                            
+                            tasksCollectionRef = collection(db, `users/${userId}/tasks`);
+                            
                             await loadTasks(); 
                             resolve();
                         } else {
-                            console.log("User is not signed in. Attempting to sign in...");
+                            console.log("User is not signed in. Attempting anonymous sign-in...");
                             try {
-                                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                                    await signInWithCustomToken(auth, __initial_auth_token);
-                                    console.log("Signed in with custom token.");
-                                } else {
-                                    await signInAnonymously(auth);
-                                    console.log("Signed in anonymously.");
-                                }
+                                await signInAnonymously(auth);
+                                console.log("Signed in anonymously.");
                             } catch (error) {
-                                console.error("Error during sign-in:", error);
+                                console.error("Error during anonymous sign-in:", error);
                                 showModalMessage(`Sign-in Error: ${error.message}. Some features may be limited.`);
                                 document.getElementById('userInfo').textContent = 'User: Anonymous (Sign-in failed)';
                                 resolve(); 
@@ -259,7 +259,7 @@
         const confettiCanvas = document.getElementById('confettiCanvas');
         const ctx = confettiCanvas.getContext('2d');
 
-        // --- Confetti Animation (Identical to previous version) ---
+        // --- Confetti Animation ---
         let confettiParticles = [];
         const confettiColors = ["#f687b3", "#a78bfa", "#facc15", "#4ade80", "#60a5fa"];
 
@@ -334,7 +334,7 @@
                     userId: userId 
                 };
                 await addDoc(tasksCollectionRef, newTask);
-                // console.log("Task added with ID: ", docRef.id); // onSnapshot will log
+                
                 taskInput.value = '';
                 taskDueDateInput.value = ''; 
                 taskPriorityInput.value = 'medium'; 
@@ -347,68 +347,49 @@
 
         function createTaskCard(id, taskData) {
             const { text, status, priority, dueDate } = taskData;
+            const cardContainer = columns[status];
+            if (!cardContainer) return;
 
-            if (document.getElementById(id)) { // Update existing card
-                const existingCard = document.getElementById(id);
-                existingCard.querySelector('.task-text').textContent = text;
-                
-                existingCard.classList.remove('priority-high', 'priority-medium', 'priority-low');
-                if (priority) existingCard.classList.add(`priority-${priority}`);
-
-                const priorityBadge = existingCard.querySelector('.priority-badge');
-                if (priorityBadge) {
-                    priorityBadge.textContent = priority.charAt(0).toUpperCase() + priority.slice(1);
-                    priorityBadge.className = `priority-badge badge-${priority}`;
-                }
-
-                const dueDateEl = existingCard.querySelector('.due-date-text');
-                if (dueDate) {
-                    const dateObj = new Date(dueDate + 'T00:00:00');
-                    const formattedDate = dateObj.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-                    if (dueDateEl) {
-                        dueDateEl.textContent = `Due: ${formattedDate}`;
-                    } else {
-                        const newDueDateEl = document.createElement('div');
-                        newDueDateEl.className = 'due-date-text';
-                        newDueDateEl.textContent = `Due: ${formattedDate}`;
-                        existingCard.appendChild(newDueDateEl);
-                    }
-                } else if (dueDateEl) {
-                    dueDateEl.remove();
-                }
-
-                const currentColumnContainer = existingCard.parentElement;
-                if (currentColumnContainer.parentElement.id !== status) {
-                    columns[status].appendChild(existingCard);
-                }
-                return existingCard;
+            const existingCard = document.getElementById(id);
+            const card = existingCard || document.createElement('div');
+            
+            if (!existingCard) {
+                card.id = id;
+                card.draggable = true;
+                card.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', id);
+                    setTimeout(() => card.classList.add('dragging'), 0); 
+                });
+                card.addEventListener('dragend', () => card.classList.remove('dragging'));
             }
 
-            // Create new card
-            const card = document.createElement('div');
-            card.id = id;
             card.className = `task-card bg-slate-700 p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-150 priority-${priority || 'medium'}`;
-            card.draggable = true;
 
-            const cardHeader = document.createElement('div');
-            cardHeader.className = 'flex justify-between items-start mb-2';
+            const formattedDueDate = dueDate 
+                ? `Due: ${new Date(dueDate + 'T00:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}`
+                : '';
 
-            const priorityBadge = document.createElement('span');
-            priorityBadge.className = `priority-badge badge-${priority || 'medium'}`;
-            priorityBadge.textContent = priority ? priority.charAt(0).toUpperCase() + priority.slice(1) : 'Medium';
-            
-            const deleteBtn = document.createElement('button');
-            deleteBtn.innerHTML = '&times;'; 
-            deleteBtn.className = 'text-red-400 hover:text-red-600 font-bold text-xl -mt-2'; 
-            deleteBtn.title = "Delete task";
-            deleteBtn.onclick = async () => {
+            card.innerHTML = `
+                <div class="flex justify-between items-start mb-2">
+                    <span class="priority-badge badge-${priority || 'medium'}">${priority ? priority.charAt(0).toUpperCase() + priority.slice(1) : 'Medium'}</span>
+                    <button class="delete-btn text-red-400 hover:text-red-600 font-bold text-xl -mt-2" title="Delete task">&times;</button>
+                </div>
+                <p class="text-slate-100 break-words task-text">${text}</p>
+                ${dueDate ? `<div class="due-date-text">${formattedDueDate}</div>` : ''}
+            `;
+
+            if (!existingCard || card.parentElement !== cardContainer) {
+                cardContainer.appendChild(card);
+            }
+
+            card.querySelector('.delete-btn').onclick = async () => {
                 const userConfirmed = await showConfirmationModal("Are you sure you want to delete this task?");
                 if (userConfirmed) {
                     try {
                         if (!db || !userId) {
                             showModalMessage("Firestore is not initialized. Cannot delete task."); return;
                         }
-                        await deleteDoc(doc(db, `artifacts/${appId}/users/${userId}/tasks`, id));
+                        await deleteDoc(doc(db, `users/${userId}/tasks`, id));
                         showModalMessage("🗑️ Task deleted.", 1500);
                     } catch (error) {
                         console.error("Error deleting task from Firestore: ", error);
@@ -416,72 +397,33 @@
                     }
                 }
             };
-            
-            cardHeader.appendChild(priorityBadge);
-            cardHeader.appendChild(deleteBtn);
-            card.appendChild(cardHeader);
-
-            const textP = document.createElement('p');
-            textP.textContent = text;
-            textP.className = 'text-slate-100 break-words task-text'; 
-            card.appendChild(textP);
-
-            if (dueDate) {
-                const dueDateEl = document.createElement('div');
-                dueDateEl.className = 'due-date-text';
-                const dateObj = new Date(dueDate + 'T00:00:00'); 
-                dueDateEl.textContent = `Due: ${dateObj.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}`;
-                card.appendChild(dueDateEl);
-            }
-            
-            card.addEventListener('dragstart', (e) => {
-                e.dataTransfer.setData('text/plain', id);
-                setTimeout(() => card.classList.add('dragging'), 0); 
-            });
-            card.addEventListener('dragend', () => card.classList.remove('dragging'));
-
-            columns[status].appendChild(card);
-            return card;
         }
 
         async function loadTasks() {
-            if (!db || !userId || !tasksCollectionRef) {
-                console.warn("Firestore not ready, skipping task load.");
+            if (!tasksCollectionRef) {
+                console.warn("Task collection reference not set, skipping task load.");
                 return;
             }
-            // No need to clear columns here, onSnapshot logic handles additions/removals/updates.
             if (unsubscribeTasks) unsubscribeTasks();
             
-            console.log("Setting up new task listener for user:", userId);
-            const q = query(tasksCollectionRef); // Consider orderBy('createdAt') for consistent order
+            console.log("Setting up new task listener...");
+            const q = query(tasksCollectionRef);
 
             unsubscribeTasks = onSnapshot(q, (querySnapshot) => {
-                console.log("Received task snapshot update. Processing changes...");
-                allTasksData = []; // Reset for export
+                console.log("Received task snapshot update.");
+                allTasksData = [];
                 const tasksInFirestore = new Set();
 
                 querySnapshot.forEach((docSnap) => {
                     tasksInFirestore.add(docSnap.id);
                     const taskData = docSnap.data();
-                    taskData.id = docSnap.id; // Add id to taskData for easier access
-                    allTasksData.push(taskData); // Store for export
+                    allTasksData.push({ id: docSnap.id, ...taskData });
                     createTaskCard(docSnap.id, taskData); 
                 });
                 
-                // Sort allTasksData by status then by priority (High > Medium > Low)
-                const priorityOrder = { high: 1, medium: 2, low: 3 };
-                allTasksData.sort((a, b) => {
-                    if (a.status < b.status) return -1;
-                    if (a.status > b.status) return 1;
-                    return (priorityOrder[a.priority] || 4) - (priorityOrder[b.priority] || 4);
-                });
-
-
-                // Remove tasks from DOM that are no longer in Firestore
                 document.querySelectorAll('.task-card').forEach(cardElement => {
                     if (!tasksInFirestore.has(cardElement.id)) {
                         cardElement.remove();
-                        console.log("Removed task from DOM (not in Firestore):", cardElement.id);
                     }
                 });
             }, (error) => {
@@ -507,9 +449,9 @@
                             showModalMessage("Firestore not initialized. Cannot update task status."); return;
                         }
                         try {
-                            const taskDocRef = doc(db, `artifacts/${appId}/users/${userId}/tasks`, taskId);
+                            const taskDocRef = doc(db, `users/${userId}/tasks`, taskId);
                             await updateDoc(taskDocRef, { status: targetStatus });
-                            // console.log(`Task ${taskId} status updated to ${targetStatus} in Firestore.`); // onSnapshot handles UI
+                            
                             if (targetStatus === 'done') {
                                 triggerConfetti();
                                 showModalMessage("🎉 Task Completed! Well done! 🎉", 2500);
@@ -522,7 +464,7 @@
                         }
                     }
                 });
-            } else { console.error(`Column element with ID ${columnKey} not found.`); }
+            }
         });
 
         // --- Notion Export ---
@@ -530,52 +472,35 @@
             let markdown = "# Kanban Task Export\n\n";
             const tasksByStatus = { todo: [], inprogress: [], done: [] };
 
-            allTasksData.forEach(task => {
+            const sortedTasks = [...allTasksData].sort((a, b) => {
+                const statusOrder = { todo: 1, inprogress: 2, done: 3 };
+                return (statusOrder[a.status] || 4) - (statusOrder[b.status] || 4);
+            });
+
+            sortedTasks.forEach(task => {
                 if (tasksByStatus[task.status]) {
                     tasksByStatus[task.status].push(task);
                 }
             });
 
-            if (tasksByStatus.todo.length > 0) {
-                markdown += "## ⏳ To Do\n";
-                tasksByStatus.todo.forEach(task => {
-                    markdown += `- [ ] ${task.text}`;
-                    if (task.priority) markdown += ` (Priority: ${task.priority.charAt(0).toUpperCase() + task.priority.slice(1)})`;
+            const createMarkdownList = (tasks, title, checkbox) => {
+                if (tasks.length === 0) return "";
+                let section = `## ${title}\n`;
+                tasks.forEach(task => {
+                    section += `- ${checkbox} ${task.text}`;
+                    if (task.priority) section += ` (Priority: ${task.priority.charAt(0).toUpperCase() + task.priority.slice(1)})`;
                     if (task.dueDate) {
                         const dateObj = new Date(task.dueDate + 'T00:00:00');
-                        markdown += ` (Due: ${dateObj.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})})`;
+                        section += ` (Due: ${dateObj.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})})`;
                     }
-                    markdown += "\n";
+                    section += "\n";
                 });
-                markdown += "\n";
-            }
+                return section + "\n";
+            };
 
-            if (tasksByStatus.inprogress.length > 0) {
-                markdown += "## ⚙️ In Progress\n";
-                tasksByStatus.inprogress.forEach(task => {
-                    markdown += `- ${task.text}`; // Notion doesn't have a standard "in progress" checkbox
-                    if (task.priority) markdown += ` (Priority: ${task.priority.charAt(0).toUpperCase() + task.priority.slice(1)})`;
-                    if (task.dueDate) {
-                        const dateObj = new Date(task.dueDate + 'T00:00:00');
-                        markdown += ` (Due: ${dateObj.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})})`;
-                    }
-                    markdown += "\n";
-                });
-                markdown += "\n";
-            }
-
-            if (tasksByStatus.done.length > 0) {
-                markdown += "## ✅ Done\n";
-                tasksByStatus.done.forEach(task => {
-                    markdown += `- [x] ${task.text}`; // Checked box for done tasks
-                    if (task.priority) markdown += ` (Priority: ${task.priority.charAt(0).toUpperCase() + task.priority.slice(1)})`;
-                    if (task.dueDate) {
-                        const dateObj = new Date(task.dueDate + 'T00:00:00');
-                        markdown += ` (Due: ${dateObj.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})})`;
-                    }
-                    markdown += "\n";
-                });
-            }
+            markdown += createMarkdownList(tasksByStatus.todo, "⏳ To Do", "[ ]");
+            markdown += createMarkdownList(tasksByStatus.inprogress, "⚙️ In Progress", "[ ]");
+            markdown += createMarkdownList(tasksByStatus.done, "✅ Done", "[x]");
             
             if (allTasksData.length === 0) {
                 markdown += "No tasks to export yet!\n";
@@ -587,15 +512,13 @@
         if (exportForNotionBtn) {
             exportForNotionBtn.addEventListener('click', () => {
                 const markdownContent = generateMarkdownForNotion();
+                showModalMessage("Tasks Exported for Notion (Copy Below):", null, true);
                 const modalTextarea = document.getElementById('modalTextarea');
                 const modalCopyButton = document.getElementById('modalCopyButton');
-                
-                showModalMessage("Tasks Exported for Notion (Copy Below):", null, true); // isExportModal = true
                 modalTextarea.value = markdownContent;
                 modalTextarea.classList.remove('hidden');
                 modalCopyButton.classList.remove('hidden');
-
-                modalTextarea.select(); // Select for easy copying
+                modalTextarea.select();
             });
         }
 
@@ -609,142 +532,104 @@
         let modalTimeoutId = null;
 
         function showModalMessage(message, duration = null, isExportModal = false) {
-            if (modalMessageText && messageModal && modalCloseButton && modalTextarea && modalCopyButton) {
-                modalMessageText.textContent = message;
-                messageModal.classList.remove('hidden');
-                modalCloseButton.textContent = "OK"; 
-                
-                // Reset visibility of export-specific elements
-                modalTextarea.classList.add('hidden');
-                modalCopyButton.classList.add('hidden');
+            if (!messageModal) return;
+            modalMessageText.textContent = message;
+            messageModal.classList.remove('hidden');
+            
+            modalTextarea.classList.add('hidden');
+            modalCopyButton.classList.add('hidden');
 
-                if (modalTimeoutId) clearTimeout(modalTimeoutId);
+            const yesBtn = document.getElementById('modalYesButton');
+            const noBtn = document.getElementById('modalNoButton');
+            if(yesBtn) yesBtn.classList.add('hidden');
+            if(noBtn) noBtn.classList.add('hidden');
+            
+            modalCloseButton.classList.remove('hidden');
 
-                if (duration && !isExportModal) { // Auto-close only if not an export modal
-                    modalTimeoutId = setTimeout(() => {
-                        messageModal.classList.add('hidden');
-                    }, duration);
-                }
-                
-                // If it's not an export modal, ensure the OK button is the primary action
-                if (!isExportModal) {
-                    modalCloseButton.classList.remove('hidden'); // Ensure OK is visible
-                    // Hide Yes/No if they were visible from a confirmation
-                    const yesBtn = document.getElementById('modalYesButton');
-                    const noBtn = document.getElementById('modalNoButton');
-                    if(yesBtn) yesBtn.classList.add('hidden');
-                    if(noBtn) noBtn.classList.add('hidden');
-                }
+            if (modalTimeoutId) clearTimeout(modalTimeoutId);
 
-
-            } else {
-                console.warn("Modal elements not found, using console for message:", message);
+            if (duration && !isExportModal) {
+                modalTimeoutId = setTimeout(() => messageModal.classList.add('hidden'), duration);
             }
         }
         
-        async function showConfirmationModal(message) {
+        function showConfirmationModal(message) {
             return new Promise((resolve) => {
-                if (modalMessageText && messageModal && modalCloseButton) {
-                    modalMessageText.textContent = message;
-                    
-                    let yesButton = document.getElementById('modalYesButton');
-                    let noButton = document.getElementById('modalNoButton');
+                if (!messageModal) { resolve(true); return; }
 
-                    modalCloseButton.classList.add('hidden'); // Hide OK
+                showModalMessage(message);
+                modalCloseButton.classList.add('hidden');
 
-                    if (!yesButton) {
-                        yesButton = document.createElement('button');
-                        yesButton.id = 'modalYesButton';
-                        yesButton.className = 'mt-4 mr-2 bg-green-500 text-white py-2 px-4 rounded-lg hover:bg-green-600 font-semibold';
-                        modalCloseButton.parentElement.appendChild(yesButton);
-                    }
-                    yesButton.textContent = "Yes";
-                    yesButton.classList.remove('hidden');
-                    
-                    if (!noButton) {
-                        noButton = document.createElement('button');
-                        noButton.id = 'modalNoButton';
-                        noButton.className = 'mt-4 ml-2 bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 font-semibold';
-                        modalCloseButton.parentElement.appendChild(noButton);
-                    }
-                    noButton.textContent = "No";
-                    noButton.classList.remove('hidden');
-                    
-                    messageModal.classList.remove('hidden');
-                    modalTextarea.classList.add('hidden'); // Ensure textarea is hidden for confirmation
-                    modalCopyButton.classList.add('hidden'); // Ensure copy button is hidden
-
-                    yesButton.onclick = () => {
-                        messageModal.classList.add('hidden');
-                        yesButton.classList.add('hidden');
-                        noButton.classList.add('hidden');
-                        modalCloseButton.classList.remove('hidden'); 
-                        resolve(true);
-                    };
-                    noButton.onclick = () => {
-                        messageModal.classList.add('hidden');
-                        yesButton.classList.add('hidden');
-                        noButton.classList.add('hidden');
-                        modalCloseButton.classList.remove('hidden'); 
-                        resolve(false);
-                    };
-                } else {
-                    console.warn("Modal elements not found for confirmation, defaulting to true.");
-                    resolve(true); 
+                let yesButton = document.getElementById('modalYesButton');
+                if (!yesButton) {
+                    yesButton = document.createElement('button');
+                    yesButton.id = 'modalYesButton';
+                    yesButton.className = 'mt-4 mr-2 bg-green-500 text-white py-2 px-4 rounded-lg hover:bg-green-600 font-semibold';
+                    modalCloseButton.parentElement.appendChild(yesButton);
                 }
+                yesButton.textContent = "Yes";
+                yesButton.classList.remove('hidden');
+                
+                let noButton = document.getElementById('modalNoButton');
+                if (!noButton) {
+                    noButton = document.createElement('button');
+                    noButton.id = 'modalNoButton';
+                    noButton.className = 'mt-4 ml-2 bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 font-semibold';
+                    modalCloseButton.parentElement.appendChild(noButton);
+                }
+                noButton.textContent = "No";
+                noButton.classList.remove('hidden');
+
+                const cleanupAndResolve = (result) => {
+                    messageModal.classList.add('hidden');
+                    yesButton.onclick = null;
+                    noButton.onclick = null;
+                    resolve(result);
+                };
+                
+                yesButton.onclick = () => cleanupAndResolve(true);
+                noButton.onclick = () => cleanupAndResolve(false);
             });
         }
 
-        if (modalCloseButton && messageModal) {
-            modalCloseButton.onclick = () => {
-                messageModal.classList.add('hidden');
-                if (modalTimeoutId) clearTimeout(modalTimeoutId);
-            };
-        }
-        if (modalCopyButton && modalTextarea) {
-            modalCopyButton.onclick = () => { 
-                modalTextarea.select();
-                modalTextarea.setSelectionRange(0, 99999); // For mobile devices
+        modalCloseButton.onclick = () => {
+            messageModal.classList.add('hidden');
+            if (modalTimeoutId) clearTimeout(modalTimeoutId);
+        };
+        modalCopyButton.onclick = () => { 
+            modalTextarea.select();
+            modalTextarea.setSelectionRange(0, 99999);
+            try {
+                navigator.clipboard.writeText(modalTextarea.value).then(() => {
+                    showModalMessage('Copied to clipboard!', 2000);
+                }, () => {
+                    throw new Error();
+                });
+            } catch (err) {
                 try {
-                    // Use document.execCommand as navigator.clipboard may not work in all iframe contexts
-                    const successful = document.execCommand('copy');
-                    const msg = successful ? 'Copied to clipboard!' : 'Copying failed.';
-                    showModalMessage(msg, 2000);
-                } catch (err) {
-                    console.error('Fallback: Oops, unable to copy', err);
+                    document.execCommand('copy');
+                    showModalMessage('Copied to clipboard!', 2000);
+                } catch (e) {
                     showModalMessage('Copying failed.', 2000);
                 }
-            };
-        }
+            }
+        };
 
         // --- Event Listeners and Initial Load ---
-        if (addTaskBtn) {
-            addTaskBtn.addEventListener('click', addTask);
-        } else {
-            console.error("Add Task button not found!");
-        }
-        
-        if (taskInput) {
-            taskInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault(); // Prevent form submission if it's in a form
-                    addTask();
-                }
-            });
-        } else {
-            console.error("Task input field not found!");
-        }
-
-        // Initialize the application
-        document.addEventListener('DOMContentLoaded', async () => {
-            console.log("DOM fully loaded. Initializing application.");
-            try {
-                await initializeFirebase();
-                console.log("Firebase setup complete.");
-            } catch (error) {
-                console.error("Failed to initialize the application due to Firebase error:", error);
-                showModalMessage("Application failed to start. Please check the console and refresh.", null);
+        addTaskBtn.addEventListener('click', addTask);
+        taskInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addTask();
             }
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("DOM fully loaded. Initializing application.");
+            initializeFirebase().catch(error => {
+                console.error("Critical application failure:", error);
+                showModalMessage("Application failed to start. Please check the console and refresh.");
+            });
         });
     </script>
 </body>
